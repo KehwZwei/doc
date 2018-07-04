@@ -8,6 +8,6 @@ class Doc {
     var httpMethod: HttpMethod = HttpMethod.POST
     var path: String = ""
     var desc: String = ""
-    var request: Array<DataNode> = emptyArray()
-    var response: Array<DataNode> = emptyArray()
+    var request: MutableList<DataNode> = mutableListOf()
+    var response: MutableList<DataNode> = mutableListOf()
 }

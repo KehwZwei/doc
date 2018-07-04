@@ -23,4 +23,8 @@ class DataNode() {
     fun appendChildren(node: DataNode) {
         this.children.add(node)
     }
+
+    fun appendChildren(node: List<DataNode>) {
+        this.children.addAll(node)
+    }
 }

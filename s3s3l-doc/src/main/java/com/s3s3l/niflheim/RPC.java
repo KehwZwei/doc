@@ -20,7 +20,7 @@ import java.lang.annotation.Target;
 @Target(ElementType.TYPE)
 public @interface RPC {
 
-    String value();
+    String value() default "";
 
     /**
      * 
@@ -29,5 +29,5 @@ public @interface RPC {
      * @return
      * @since JDK 1.8
      */
-    String path();
+    String path() default "";
 }

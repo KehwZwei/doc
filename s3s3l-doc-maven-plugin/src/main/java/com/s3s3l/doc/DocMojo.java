@@ -8,48 +8,37 @@ import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
+import com.s3s3l.niflheim.*;
+import com.s3s3l.niflheim.markdown.MarkdownDocBuilder;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
-import org.codehaus.plexus.util.StringUtils;
 
-import com.s3s3l.niflheim.DataNode;
-import com.s3s3l.niflheim.DataType;
-import com.s3s3l.niflheim.DocBook;
-import com.s3s3l.niflheim.Http;
-import com.s3s3l.niflheim.Interface;
-import com.s3s3l.niflheim.NiflheimDoc;
-import com.s3s3l.niflheim.Param;
-import com.s3s3l.niflheim.RPC;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
- * 
  * <p>
  * </p>
  * ClassName: DocMojo <br>
  * date: Jun 25, 2018 7:01:04 PM <br>
- * 
+ *
  * @author kehw_zwei
  * @version 1.0.0
  * @since JDK 1.8
  */
-@Mojo(name = "doc", defaultPhase = LifecyclePhase.PACKAGE)
-public class DocMojo extends AbstractMojo {
+@Mojo(name = "doc", defaultPhase = LifecyclePhase.PACKAGE) public class DocMojo extends AbstractMojo {
 
-    @Parameter(defaultValue = "${project.build.outputDirectory}")
-    private String outputDirectory;
-    @Parameter(defaultValue = "${project.build.directory}")
-    private String directory;
+    @Parameter(defaultValue = "${project.build.outputDirectory}") private String outputDirectory;
+    @Parameter(defaultValue = "${project.build.directory}") private String directory;
 
-    public void execute() throws MojoExecutionException, MojoFailureException {
+    public void execute() throws MojoExecutionException {
         try {
             scanClasses(new File(outputDirectory));
         } catch (IOException e) {
@@ -58,14 +47,15 @@ public class DocMojo extends AbstractMojo {
     }
 
     private void scanClasses(File file) throws IOException {
+        DocBuilder docBuilder = new MarkdownDocBuilder();
 
-        try (URLClassLoader cl = new URLClassLoader(new URL[] { new File(outputDirectory).toURI()
-                .toURL() }, DocMojo.class.getClassLoader())) {
+        try (URLClassLoader cl = new URLClassLoader(new URL[] { new File(outputDirectory).toURI().toURL() },
+                DocMojo.class.getClassLoader())) {
             if (file.isFile()) {
                 getLog().info(file.getPath());
                 try {
                     // checkAnnotation(file, cl);
-                    createDocBook(cl.loadClass(pathToPackage(file.getPath())));
+                    getLog().info(docBuilder.build(createDocBook(cl.loadClass(pathToPackage(file.getPath())))));
                 } catch (Exception e) {
                     getLog().warn(String.format("Error to create doc for %s", file.getAbsolutePath()), e);
                 }
@@ -83,7 +73,9 @@ public class DocMojo extends AbstractMojo {
         }
         DocBook book = new DocBook();
         NiflheimDoc niflheimDoc = cls.getAnnotation(NiflheimDoc.class);
-        book.setName(getFirstValidString(niflheimDoc.name(), niflheimDoc.value()));
+        String bookName = getFirstValidString(niflheimDoc.name(), niflheimDoc.value(), cls.getSimpleName());
+        getLog().info("bookName: " + bookName);
+        book.setName(bookName);
         for (Method method : cls.getMethods()) {
             Doc doc = createDoc(method, cls);
             if (doc != null) {
@@ -121,6 +113,7 @@ public class DocMojo extends AbstractMojo {
                 }
                 RPC rpc = cls.getAnnotation(RPC.class);
                 doc.setPath(rpc.path());
+                doc.setRequest(createRPCRequestNode(method, cls, ""));
                 break;
             default:
                 break;
@@ -150,6 +143,7 @@ public class DocMojo extends AbstractMojo {
                 node = new DataNode("arg" + i,
                         getFirstValidString(param.desc(), param.name(), param.value(), parameter.getName()),
                         DataType.JSON, param.remark());
+                node.appendChildren(toDataNode(parameter.getType()));
             }
 
             args.appendChildren(node);
@@ -179,8 +173,14 @@ public class DocMojo extends AbstractMojo {
 
             Param param = field.getAnnotation(Param.class);
 
+            DataType dataType = getDataType(cls);
             DataNode node = new DataNode(getFirstValidString(param.name(), param.value(), field.getName()),
-                    param.desc(), getDataType(cls), param.remark());
+                    param.desc(), dataType, param.remark());
+            if (DataType.OBJECT == dataType) {
+                node.appendChildren(toDataNode(cls));
+            }
+
+            params.add(node);
         }
         return params;
     }
@@ -201,18 +201,12 @@ public class DocMojo extends AbstractMojo {
             return DataType.OBJECT;
         }
 
-        return DataType.OBJECT;
-    }
-
-    public static void main(String[] args) {
-        System.out.println(Integer.class.isPrimitive());
-        System.out.println(Number.class.isAssignableFrom(Integer.class));
-        System.out.println(Number.class.isAssignableFrom(int.class));
+        return DataType.STRING;
     }
 
     private String getFirstValidString(String... strings) {
         for (String string : strings) {
-            if (!StringUtils.isBlank(string)) {
+            if (!isBlank(string)) {
                 return string;
             }
         }
@@ -220,8 +214,20 @@ public class DocMojo extends AbstractMojo {
         return null;
     }
 
-    @SuppressWarnings("unused")
-    private void checkAnnotation(File file, ClassLoader cl) throws ClassNotFoundException, IOException {
+    private boolean isBlank(String str) {
+        int strLen;
+        if (str == null || (strLen = str.length()) == 0) {
+            return true;
+        }
+        for (int i = 0; i < strLen; i++) {
+            if (!Character.isWhitespace(str.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    @SuppressWarnings("unused") private void checkAnnotation(File file, ClassLoader cl) throws ClassNotFoundException {
         Class<?> cls = cl.loadClass(pathToPackage(file.getPath()));
         for (Annotation annotation : cls.getAnnotations()) {
             getLog().info(annotation.toString());
@@ -229,8 +235,7 @@ public class DocMojo extends AbstractMojo {
     }
 
     private String pathToPackage(String path) {
-        path = path.substring(outputDirectory.length(), path.indexOf(".class"))
-                .replaceAll("/", ".");
+        path = path.substring(outputDirectory.length(), path.indexOf(".class")).replaceAll("/", ".");
         if (path.startsWith(".")) {
             path = path.replaceFirst(".", "");
         }

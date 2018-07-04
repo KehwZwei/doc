@@ -22,7 +22,7 @@ import com.s3s3l.doc.HttpMethod;
 @Target(ElementType.METHOD)
 public @interface Http {
 
-    String value();
+    String value() default "";
 
     /**
      * 
@@ -31,7 +31,7 @@ public @interface Http {
      * @return
      * @since JDK 1.8
      */
-    String path();
+    String path() default "";
 
     HttpMethod method() default HttpMethod.POST;
 }

@@ -22,7 +22,7 @@ import com.s3s3l.doc.RequestType;
 @Target(ElementType.METHOD)
 public @interface Interface {
 
-    String value();
+    String value() default "";
     
     /**
      * 
@@ -31,7 +31,7 @@ public @interface Interface {
      * @return 
      * @since JDK 1.8
      */
-    String name();
+    String name() default "";
     
     RequestType requestType() default RequestType.HTTP_OR_HTTPS;
     
