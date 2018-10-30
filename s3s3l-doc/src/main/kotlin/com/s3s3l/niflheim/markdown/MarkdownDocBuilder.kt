@@ -7,6 +7,7 @@ import com.s3s3l.niflheim.DocBook
 import com.s3s3l.niflheim.DocBuilder
 import net.steppschuh.markdowngenerator.list.UnorderedList
 import net.steppschuh.markdowngenerator.rule.HorizontalRule
+import net.steppschuh.markdowngenerator.table.Table
 import net.steppschuh.markdowngenerator.text.code.CodeBlock
 import net.steppschuh.markdowngenerator.text.emphasis.BoldText
 import net.steppschuh.markdowngenerator.text.heading.Heading
@@ -58,13 +59,32 @@ class MarkdownDocBuilder : DocBuilder {
                 .appendCol(node.remark)
         row.prefix = prefix
 
-        for (child in node.children){
+        for (child in node.children) {
             currentRow = toRow(currentRow, child, prefix + 1)
         }
 
-        if(preRow != null) {
+        if (preRow != null) {
             preRow.next = row
         }
         return row
+    }
+
+    private fun toTable(rows: List<Row>): String {
+        var tableBuilder = Table.Builder().addRow("Name", "Desc", "Type", "Remark")
+
+        for (row in rows) {
+            appendRow(row, tableBuilder)
+        }
+        return ""
+    }
+
+    private fun appendRow(row: Row, tableBuilder: Table.Builder): Table.Builder {
+        tableBuilder.addRow(row.cols[0], row.cols[1], row.cols[2], row.cols[3])
+        var next = row.next
+        if (next != null) {
+            appendRow(next, tableBuilder)
+        }
+
+        return tableBuilder
     }
 }
